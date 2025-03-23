@@ -1,4 +1,4 @@
-package main
+package router
 
 import (
 	"crypto/sha256"
@@ -10,11 +10,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArmaanKatyal/go-api-gateway/server/auth"
-	"github.com/ArmaanKatyal/go-api-gateway/server/config"
-	"github.com/ArmaanKatyal/go-api-gateway/server/feature"
-	"github.com/ArmaanKatyal/go-api-gateway/server/middleware"
-	"github.com/ArmaanKatyal/go-api-gateway/server/observability"
+	"github.com/ArmaanKatyal/go-api-gateway/pkg/auth"
+	"github.com/ArmaanKatyal/go-api-gateway/pkg/config"
+	"github.com/ArmaanKatyal/go-api-gateway/pkg/feature"
+	"github.com/ArmaanKatyal/go-api-gateway/pkg/middleware"
+	"github.com/ArmaanKatyal/go-api-gateway/pkg/observability"
+	"github.com/ArmaanKatyal/go-api-gateway/pkg/proxy"
+	"github.com/ArmaanKatyal/go-api-gateway/pkg/util"
 
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -22,7 +24,7 @@ import (
 )
 
 type RequestHandler struct {
-	ServiceRegistry *ServiceRegistry
+	ServiceRegistry *proxy.ServiceRegistry
 	RateLimiter     *feature.GlobalRateLimiter
 	Metrics         *observability.PromMetrics
 }
@@ -30,42 +32,10 @@ type RequestHandler struct {
 func NewRequestHandler() *RequestHandler {
 	m := observability.NewPromMetrics()
 	return &RequestHandler{
-		ServiceRegistry: NewServiceRegistry(m),
+		ServiceRegistry: proxy.NewServiceRegistry(m),
 		RateLimiter:     feature.NewGlobalRateLimiter(),
 		Metrics:         m,
 	}
-}
-
-// RequestToMap converts the request to a map
-func RequestToMap(r *http.Request) map[string]interface{} {
-	result := make(map[string]interface{})
-
-	result["method"] = r.Method
-
-	result["url"] = r.URL.String()
-
-	// Use the first value for each header, query parameter, and form field
-	headers := make(map[string]string)
-	for name, values := range r.Header {
-		headers[name] = values[0]
-	}
-	result["headers"] = headers
-
-	queryParams := make(map[string]string)
-	for name, values := range r.URL.Query() {
-		queryParams[name] = values[0]
-	}
-	result["query_params"] = queryParams
-
-	if err := r.ParseForm(); err == nil {
-		formValues := make(map[string]string)
-		for name, values := range r.Form {
-			formValues[name] = values[0]
-		}
-		result["form_values"] = formValues
-	}
-
-	return result
 }
 
 func GetStatusCode(statusCode int) string {
@@ -74,7 +44,7 @@ func GetStatusCode(statusCode int) string {
 
 // Health is a simple health check endpoint
 func Health(w http.ResponseWriter, r *http.Request) {
-	slog.Info("Health check", "req", RequestToMap(r))
+	slog.Info("Health check", "req", util.RequestToMap(r))
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write([]byte("OK")); err != nil {
 		slog.Error("Error writing response", "error", err.Error())
@@ -83,7 +53,7 @@ func Health(w http.ResponseWriter, r *http.Request) {
 
 // Config returns the application configuration
 func Config(w http.ResponseWriter, r *http.Request) {
-	slog.Info("Get config", "req", RequestToMap(r))
+	slog.Info("Get config", "req", util.RequestToMap(r))
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write(config.AppConfig.GetConfMarshal()); err != nil {
@@ -139,7 +109,7 @@ func (rh *RequestHandler) createForwardURI(address string, route []string, query
 // HandleRequest handles the incoming request and forwards it to the resolved service
 func (rh *RequestHandler) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-	slog.Info("Received request", "req", RequestToMap(r))
+	slog.Info("Received request", "req", util.RequestToMap(r))
 	serviceName, route := rh.resolvePath(r.URL.Path)
 	slog.Info("Resolving service", "service_name", serviceName)
 	service := rh.ServiceRegistry.GetService(serviceName)
@@ -242,7 +212,7 @@ func (rh *RequestHandler) generateCacheKey(service string, r *http.Request) stri
 	}
 	val, err := io.ReadAll(r.Body)
 	if err != nil {
-		slog.Error("failed to parse req body while generating cache key", "service", service, "req", RequestToMap(r))
+		slog.Error("failed to parse req body while generating cache key", "service", service, "req", util.RequestToMap(r))
 		val = []byte{}
 	}
 	components := []string{service, r.Method, r.URL.String(), headers, string(val)}
@@ -313,7 +283,7 @@ func copyResponseHeaders(w http.ResponseWriter, resp *http.Response) {
 }
 
 // forwardRequestCB forwards the request to the resolved service with circuit breaker
-func (rh *RequestHandler) forwardRequestCB(w http.ResponseWriter, r *http.Request, forwardURI string, cb ICircuitBreaker, service string, t time.Time) error {
+func (rh *RequestHandler) forwardRequestCB(w http.ResponseWriter, r *http.Request, forwardURI string, cb proxy.ICircuitBreaker, service string, t time.Time) error {
 	// Define the request execution function
 	executeRequest := func() ([]byte, error) {
 		// Create a new request

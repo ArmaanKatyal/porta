@@ -3,7 +3,7 @@ package feature
 import (
 	"log/slog"
 
-	"github.com/ArmaanKatyal/go-api-gateway/server/config"
+	"github.com/ArmaanKatyal/go-api-gateway/pkg/config"
 	"github.com/sony/gobreaker/v2"
 )
 

@@ -9,25 +9,27 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/ArmaanKatyal/go-api-gateway/server/config"
+	"github.com/ArmaanKatyal/go-api-gateway/pkg/config"
+	"github.com/ArmaanKatyal/go-api-gateway/pkg/logging"
+	"github.com/ArmaanKatyal/go-api-gateway/pkg/router"
 )
 
 func main() {
 	// Initialize logger
-	opts := PrettyHandlerOptions{
+	opts := logging.PrettyHandlerOptions{
 		SlogOpts: slog.HandlerOptions{
 			Level: slog.LevelDebug,
 		},
 	}
-	handler := NewPrettyHandler(os.Stdout, opts)
+	handler := logging.NewPrettyHandler(os.Stdout, opts)
 	logger := slog.New(handler)
 	slog.SetDefault(logger)
 
 	// Load configuration
 	config.LoadConf()
 	// Initialize registry
-	rh := NewRequestHandler()
-	router := InitializeRoutes(rh)
+	rh := router.NewRequestHandler()
+	router := router.InitializeRoutes(rh)
 
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,

@@ -1,8 +1,8 @@
 run: build
 	./bin/server
-	
+
 build:
-	go build -o bin/server ./server
+	go build -o bin/server ./cmd
 
 clean:
 	rm -rf bin

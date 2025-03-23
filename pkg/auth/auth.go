@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArmaanKatyal/go-api-gateway/server/config"
+	"github.com/ArmaanKatyal/go-api-gateway/pkg/config"
 	"github.com/golang-jwt/jwt/v5"
 )
 

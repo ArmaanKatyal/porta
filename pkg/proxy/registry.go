@@ -1,4 +1,4 @@
-package main
+package proxy
 
 import (
 	"encoding/json"
@@ -9,10 +9,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ArmaanKatyal/go-api-gateway/server/auth"
-	"github.com/ArmaanKatyal/go-api-gateway/server/config"
-	"github.com/ArmaanKatyal/go-api-gateway/server/feature"
-	"github.com/ArmaanKatyal/go-api-gateway/server/observability"
+	"github.com/ArmaanKatyal/go-api-gateway/pkg/auth"
+	"github.com/ArmaanKatyal/go-api-gateway/pkg/config"
+	"github.com/ArmaanKatyal/go-api-gateway/pkg/feature"
+	"github.com/ArmaanKatyal/go-api-gateway/pkg/observability"
+	"github.com/ArmaanKatyal/go-api-gateway/pkg/util"
 )
 
 type RegisterBody config.ServiceConf
@@ -219,7 +220,7 @@ func NewServiceRegistry(metrics *observability.PromMetrics) *ServiceRegistry {
 
 // RegisterService registers a service with the registry
 func (sr *ServiceRegistry) RegisterService(w http.ResponseWriter, r *http.Request) {
-	slog.Info("Registering service", "req", RequestToMap(r))
+	slog.Info("Registering service", "req", util.RequestToMap(r))
 	var rb RegisterBody
 	err := json.NewDecoder(r.Body).Decode(&rb)
 	if err != nil {
@@ -271,7 +272,7 @@ func (sr *ServiceRegistry) RegisterService(w http.ResponseWriter, r *http.Reques
 
 // UpdateService updates an existing service in the registry
 func (sr *ServiceRegistry) UpdateService(w http.ResponseWriter, r *http.Request) {
-	slog.Info("Updating service", "req", RequestToMap(r))
+	slog.Info("Updating service", "req", util.RequestToMap(r))
 	var ub UpdateBody
 	err := json.NewDecoder(r.Body).Decode(&ub)
 	if err != nil {
@@ -334,7 +335,7 @@ func (sr *ServiceRegistry) UpdateService(w http.ResponseWriter, r *http.Request)
 
 // DeregisterService unregisters a service from the registry
 func (sr *ServiceRegistry) DeregisterService(w http.ResponseWriter, r *http.Request) {
-	slog.Info("Unregistering service", "req", RequestToMap(r))
+	slog.Info("Unregistering service", "req", util.RequestToMap(r))
 	var db DeregisterBody
 	err := json.NewDecoder(r.Body).Decode(&db)
 	if err != nil {
@@ -358,7 +359,7 @@ func (sr *ServiceRegistry) DeregisterService(w http.ResponseWriter, r *http.Requ
 
 // GetServices returns the registered services
 func (sr *ServiceRegistry) GetServices(w http.ResponseWriter, r *http.Request) {
-	slog.Info("Retrieved registered services", "req", RequestToMap(r))
+	slog.Info("Retrieved registered services", "req", util.RequestToMap(r))
 	j, err := json.Marshal(sr.Services)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

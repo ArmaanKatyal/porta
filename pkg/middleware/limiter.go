@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/ArmaanKatyal/go-api-gateway/server/feature"
+	"github.com/ArmaanKatyal/go-api-gateway/pkg/feature"
 )
 
 func RateLimiterMiddleware(limiter *feature.GlobalRateLimiter) func(http.HandlerFunc) http.HandlerFunc {
