@@ -9,11 +9,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ArmaanKatyal/go-api-gateway/pkg/auth"
-	"github.com/ArmaanKatyal/go-api-gateway/pkg/config"
-	"github.com/ArmaanKatyal/go-api-gateway/pkg/feature"
-	"github.com/ArmaanKatyal/go-api-gateway/pkg/observability"
-	"github.com/ArmaanKatyal/go-api-gateway/pkg/util"
+	"github.com/ArmaanKatyal/porta/pkg/auth"
+	"github.com/ArmaanKatyal/porta/pkg/config"
+	"github.com/ArmaanKatyal/porta/pkg/feature"
+	"github.com/ArmaanKatyal/porta/pkg/observability"
+	"github.com/ArmaanKatyal/porta/pkg/util"
 )
 
 type RegisterBody config.ServiceConf

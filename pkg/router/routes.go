@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArmaanKatyal/go-api-gateway/pkg/auth"
-	"github.com/ArmaanKatyal/go-api-gateway/pkg/config"
-	"github.com/ArmaanKatyal/go-api-gateway/pkg/observability"
-	"github.com/ArmaanKatyal/go-api-gateway/pkg/proxy"
-	"github.com/ArmaanKatyal/go-api-gateway/pkg/util"
+	"github.com/ArmaanKatyal/porta/pkg/auth"
+	"github.com/ArmaanKatyal/porta/pkg/config"
+	"github.com/ArmaanKatyal/porta/pkg/observability"
+	"github.com/ArmaanKatyal/porta/pkg/proxy"
+	"github.com/ArmaanKatyal/porta/pkg/util"
 
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus/promhttp"

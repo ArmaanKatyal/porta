@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/ArmaanKatyal/go-api-gateway/pkg/config"
+	"github.com/ArmaanKatyal/porta/pkg/config"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"

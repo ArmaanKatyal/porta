@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArmaanKatyal/go-api-gateway/pkg/config"
+	"github.com/ArmaanKatyal/porta/pkg/config"
 	"github.com/patrickmn/go-cache"
 	"github.com/stretchr/testify/assert"
 )

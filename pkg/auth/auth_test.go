@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArmaanKatyal/go-api-gateway/pkg/config"
+	"github.com/ArmaanKatyal/porta/pkg/config"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 )

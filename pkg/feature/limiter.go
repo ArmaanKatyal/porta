@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ArmaanKatyal/go-api-gateway/pkg/config"
+	"github.com/ArmaanKatyal/porta/pkg/config"
 	"golang.org/x/time/rate"
 )
 

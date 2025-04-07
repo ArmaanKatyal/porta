@@ -3,7 +3,7 @@ package observability
 import (
 	"testing"
 
-	"github.com/ArmaanKatyal/go-api-gateway/pkg/config"
+	"github.com/ArmaanKatyal/porta/pkg/config"
 
 	"github.com/stretchr/testify/assert"
 )

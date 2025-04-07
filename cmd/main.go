@@ -9,9 +9,9 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/ArmaanKatyal/go-api-gateway/pkg/config"
-	"github.com/ArmaanKatyal/go-api-gateway/pkg/logging"
-	"github.com/ArmaanKatyal/go-api-gateway/pkg/router"
+	"github.com/ArmaanKatyal/porta/pkg/config"
+	"github.com/ArmaanKatyal/porta/pkg/logging"
+	"github.com/ArmaanKatyal/porta/pkg/router"
 )
 
 func main() {
