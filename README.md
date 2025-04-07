@@ -1,6 +1,6 @@
-# go-api-gateway
+# Porta
 
-It is a work-in-progress API Gateway built in Go, designed for learning and experimentation. It includes various essential features commonly found in production API Gateways.
+It's an API Gateway built in Go, designed for learning and experimentation. It includes various essential features commonly found in production API Gateways.
 
 If you are looking for an actual lightweight production grade api-gateway checkout [motiv-labs/janus](https://github.com/motiv-labs/janus)
 
