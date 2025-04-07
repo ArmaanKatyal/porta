@@ -61,11 +61,6 @@ data:
       metrics:
         prefix: "gateway"
         buckets: [0.005, 0.01, 0.025, 0.05, 0.1]
-      rateLimiter:
-        enabled: true
-        rate: 100
-        burst: 100
-        cleanupInterval: 3600
     registry:
       heartbeatInterval: 15
       services:
@@ -93,6 +88,6 @@ data:
             failureRatio: 0.5
           rateLimiter:
             enabled: true
-            rate: 10
-            burst: 10
+            rate: 100
+            burst: 200
             cleanupInterval: 3600

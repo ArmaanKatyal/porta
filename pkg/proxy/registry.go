@@ -57,7 +57,7 @@ type IWhitelist interface {
 }
 
 type IRateLimiter interface {
-	GetVisitor(ip string) *feature.Visitor
+	Allow(ip string) bool
 	IsEnabled() bool
 }
 
@@ -98,12 +98,7 @@ func (s *Service) IsRateLimiterEnabled() bool {
 }
 
 func (s *Service) RateLimitIP(ip string) bool {
-	ip, _, err := net.SplitHostPort(ip)
-	if err != nil {
-		return false
-	}
-	v := s.RateLimiter.GetVisitor(ip)
-	return v.Limiter.Allow()
+	return s.RateLimiter.Allow(ip)
 }
 
 func (s *Service) IsWhitelisted(addr string) (bool, error) {

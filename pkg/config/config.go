@@ -2,12 +2,13 @@ package config
 
 import (
 	"encoding/json"
-	"github.com/go-playground/validator/v10"
-	"github.com/sony/gobreaker/v2"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/go-playground/validator/v10"
+	"github.com/sony/gobreaker/v2"
 
 	"gopkg.in/yaml.v3"
 )
@@ -103,8 +104,6 @@ type Conf struct {
 			Prefix  string    `yaml:"prefix"`
 			Buckets []float64 `yaml:"buckets"`
 		} `yaml:"metrics"`
-
-		RateLimiter RateLimiterSettings `yaml:"rateLimiter"`
 	}
 
 	Registry struct {

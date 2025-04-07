@@ -12,8 +12,6 @@ import (
 
 	"github.com/ArmaanKatyal/go-api-gateway/pkg/auth"
 	"github.com/ArmaanKatyal/go-api-gateway/pkg/config"
-	"github.com/ArmaanKatyal/go-api-gateway/pkg/feature"
-	"github.com/ArmaanKatyal/go-api-gateway/pkg/middleware"
 	"github.com/ArmaanKatyal/go-api-gateway/pkg/observability"
 	"github.com/ArmaanKatyal/go-api-gateway/pkg/proxy"
 	"github.com/ArmaanKatyal/go-api-gateway/pkg/util"
@@ -25,7 +23,6 @@ import (
 
 type RequestHandler struct {
 	ServiceRegistry *proxy.ServiceRegistry
-	RateLimiter     *feature.GlobalRateLimiter
 	Metrics         *observability.PromMetrics
 }
 
@@ -33,7 +30,6 @@ func NewRequestHandler() *RequestHandler {
 	m := observability.NewPromMetrics()
 	return &RequestHandler{
 		ServiceRegistry: proxy.NewServiceRegistry(m),
-		RateLimiter:     feature.NewGlobalRateLimiter(),
 		Metrics:         m,
 	}
 }
@@ -72,7 +68,7 @@ func InitializeRoutes(r *RequestHandler) *http.ServeMux {
 	mux.HandleFunc("POST /services/update", r.ServiceRegistry.UpdateService)
 	mux.HandleFunc("GET /health", Health)
 	mux.HandleFunc("GET /config", Config)
-	mux.HandleFunc("/", middleware.RateLimiterMiddleware(r.RateLimiter)(r.HandleRequest))
+	mux.HandleFunc("/", r.HandleRequest)
 	mux.Handle("GET /metrics", promhttp.Handler())
 	return mux
 }
