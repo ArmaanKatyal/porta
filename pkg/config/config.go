@@ -162,19 +162,11 @@ func LoadConf() {
 func GetCertFile() string {
 	// Append path to root folder
 	certPath := filepath.Join(GetWd(), AppConfig.Server.TLSConfig.CertFile)
-	if _, err := os.Stat(certPath); os.IsNotExist(err) {
-		slog.Error("Certificate file not found", "path", certPath)
-		os.Exit(1)
-	}
 	return certPath
 }
 
 func GetKeyFile() string {
 	certPath := filepath.Join(GetWd(), AppConfig.Server.TLSConfig.KeyFile)
-	if _, err := os.Stat(certPath); os.IsNotExist(err) {
-		slog.Error("Key file not found", "path", certPath)
-		os.Exit(1)
-	}
 	return certPath
 }
 
