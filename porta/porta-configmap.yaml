@@ -10,7 +10,7 @@ data:
       readTimeout: 5
       writeTimeout: 10
       gracefulTimeout: 5
-      tlsconfig:
+      tls:
         enabled: false
         certFile: "path/to/cert.pem"
         keyFile: "path/to/key.pem"
@@ -20,7 +20,8 @@ data:
     registry:
       heartbeatInterval: 15
       services:
-        - name: example
+        example:
+          name: "example"
           addr: "localhost:3000"
           whitelist:
             - "ALL"
@@ -44,6 +45,6 @@ data:
             failureRatio: 0.5
           rateLimiter:
             enabled: true
-            rate: 100
-            burst: 200
+            rate: 10
+            burst: 10
             cleanupInterval: 3600

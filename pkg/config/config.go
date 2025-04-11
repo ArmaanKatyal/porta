@@ -82,6 +82,18 @@ type ServiceConf struct {
 	RateLimiter    RateLimiterSettings `yaml:"rateLimiter"`
 }
 
+type TLSConfig struct {
+	Enabled bool `yaml:"enabled"`
+	// path to the certificate and key files
+	CertFile string `yaml:"certFile"`
+	KeyFile  string `yaml:"keyFile"`
+}
+
+type Metrics struct {
+	Prefix  string    `yaml:"prefix"`
+	Buckets []float64 `yaml:"buckets"`
+}
+
 type Conf struct {
 	Server struct {
 		Host string `yaml:"host"`
@@ -93,23 +105,14 @@ type Conf struct {
 		// the maximum duration before timing out the graceful shutdown
 		GracefulTimeout int `yaml:"gracefulTimeout"`
 
-		TLSConfig struct {
-			Enabled bool `yaml:"enabled"`
-			// path to the certificate and key files
-			CertFile string `yaml:"certFile"`
-			KeyFile  string `yaml:"keyFile"`
-		}
-
-		Metrics struct {
-			Prefix  string    `yaml:"prefix"`
-			Buckets []float64 `yaml:"buckets"`
-		} `yaml:"metrics"`
+		TLS     TLSConfig `yaml:"tls"`
+		Metrics Metrics   `yaml:"metrics"`
 	}
 
 	Registry struct {
 		// Interval (secs) at which the service will send a heartbeat to all registered services
 		HeartbeatInterval int `yaml:"heartbeatInterval"`
-		Services          []ServiceConf
+		Services          map[string]ServiceConf
 	}
 }
 
@@ -161,17 +164,17 @@ func LoadConf() {
 
 func GetCertFile() string {
 	// Append path to root folder
-	certPath := filepath.Join(GetWd(), AppConfig.Server.TLSConfig.CertFile)
+	certPath := filepath.Join(GetWd(), AppConfig.Server.TLS.CertFile)
 	return certPath
 }
 
 func GetKeyFile() string {
-	certPath := filepath.Join(GetWd(), AppConfig.Server.TLSConfig.KeyFile)
+	certPath := filepath.Join(GetWd(), AppConfig.Server.TLS.KeyFile)
 	return certPath
 }
 
 func TLSEnabled() bool {
-	return AppConfig.Server.TLSConfig.Enabled
+	return AppConfig.Server.TLS.Enabled
 }
 
 func GetWd() string {

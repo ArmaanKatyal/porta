@@ -4,7 +4,7 @@ server:
   readTimeout: 5
   writeTimeout: 10
   gracefulTimeout: 5
-  tlsconfig:
+  tls:
     enabled: false
     certFile: "path/to/cert.pem"
     keyFile: "path/to/key.pem"
@@ -14,7 +14,8 @@ server:
 registry:
   heartbeatInterval: 15
   services:
-    - name: example
+    example:
+      name: "example"
       addr: "localhost:3000"
       whitelist:
         - "ALL"
