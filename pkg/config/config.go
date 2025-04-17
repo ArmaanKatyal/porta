@@ -2,23 +2,27 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/sony/gobreaker/v2"
-
-	"gopkg.in/yaml.v3"
+	"github.com/spf13/viper"
 )
 
 // AppConfig is the global configuration object
-var AppConfig Conf
-var Validate *validator.Validate
+var AppConfig *Conf
 
 func init() {
-	Validate = validator.New(validator.WithRequiredStructEnabled())
+	serviceName := "porta"
+
+	viper.SetDefault("server.port", "8080")
+	viper.SetDefault("server.host", "localhost")
+	viper.SetDefault("server.tls.port", "8433")
+	viper.SetDefault("server.metrics.prefix", serviceName)
+	viper.SetDefault("server.metrics.buckets", []float64{0.005, 0.01, 0.025, 0.05, 0.1})
 }
 
 type CircuitSettings struct {
@@ -143,23 +147,23 @@ func (c *Conf) Verify() bool {
 }
 
 // LoadConf loads the configuration from the config.yaml file
-func LoadConf() {
-	c := Conf{}
-	yamlFile, err := os.ReadFile("./config/config.yaml")
-	if err != nil {
-		slog.Error("yamlFile.Get err", "error", err.Error())
+func Load(configFile string) (*Conf, error) {
+	if configFile != "" {
+		viper.SetConfigFile(configFile)
+	} else {
+		viper.SetConfigName("config")
+		viper.SetConfigType("yaml")
+		viper.AddConfigPath("./config")
 	}
-	err = yaml.Unmarshal(yamlFile, &c)
-	if err != nil {
-		slog.Error("yaml unmarshal error ocurred", "error", err.Error())
-		os.Exit(1)
+	if err := viper.ReadInConfig(); err != nil {
+		return nil, fmt.Errorf("config file not found: %w", err)
 	}
-	if !c.Verify() {
-		slog.Error("Config verification failed")
-		os.Exit(1)
+	var config Conf
+	if err := viper.Unmarshal(&config); err != nil {
+		return nil, err
 	}
-	AppConfig = c
-	slog.Info("Config loaded successfully")
+
+	return &config, nil
 }
 
 func GetCertFile() string {

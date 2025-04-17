@@ -9,7 +9,7 @@ server:
     certFile: "path/to/cert.pem"
     keyFile: "path/to/key.pem"
   metrics:
-    prefix: "gateway"
+    prefix: "porta"
     buckets: [0.005, 0.01, 0.025, 0.05, 0.1]
 registry:
   heartbeatInterval: 15

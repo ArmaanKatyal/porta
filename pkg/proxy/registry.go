@@ -224,13 +224,6 @@ func (sr *ServiceRegistry) RegisterService(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err = config.Validate.Struct(rb)
-	if err != nil {
-		slog.Error("Error validating body", "error", err.Error())
-		http.Error(w, "Error validating request body", http.StatusBadRequest)
-		return
-	}
-
 	wl := feature.NewIPWhiteList()
 	feature.PopulateIPWhiteList(wl, rb.WhiteList)
 
@@ -273,13 +266,6 @@ func (sr *ServiceRegistry) UpdateService(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		slog.Error("Error decoding request", "error", err.Error())
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	err = config.Validate.Struct(ub)
-	if err != nil {
-		slog.Error("Error validating update request body", "error", err.Error())
-		http.Error(w, "Error validating request body", http.StatusBadRequest)
 		return
 	}
 

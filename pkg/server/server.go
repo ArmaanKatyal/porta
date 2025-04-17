@@ -51,7 +51,11 @@ func Start() error {
 	slog.SetDefault(logger)
 
 	// 2) Load configuration
-	config.LoadConf()
+	conf, err := config.Load("")
+	if err != nil {
+		return err
+	}
+	config.AppConfig = conf
 
 	// 3) Build the router
 	rh := router.NewRequestHandler()
