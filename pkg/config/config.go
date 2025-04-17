@@ -19,8 +19,8 @@ func init() {
 	serviceName := "porta"
 
 	viper.SetDefault("server.port", "8080")
+	viper.SetDefault("admin.port", "8081")
 	viper.SetDefault("server.host", "localhost")
-	viper.SetDefault("server.tls.port", "8433")
 	viper.SetDefault("server.metrics.prefix", serviceName)
 	viper.SetDefault("server.metrics.buckets", []float64{0.005, 0.01, 0.025, 0.05, 0.1})
 }
