@@ -99,9 +99,17 @@ type Metrics struct {
 }
 
 type Conf struct {
+	Admin struct {
+		Port            string    `yaml:"port"`
+		ReadTimeout     int       `yaml:"readTimeout"`
+		WriteTimeout    int       `yaml:"writeTimeout"`
+		GracefulTimeout int       `yaml:"gracefulTimeout"`
+		TLS             TLSConfig `yaml:"tls"`
+	} `yaml:"admin"`
 	Server struct {
-		Host string `yaml:"host"`
-		Port string `yaml:"port"`
+		Host      string `yaml:"host"`
+		Port      string `yaml:"port"`
+		AdminPort string `yaml:"adminPort"`
 		// the maximum duration for reading the entire request, including the body
 		ReadTimeout int `yaml:"readTimeout"`
 		// the maximum duration before timing out writes of the response
@@ -120,8 +128,8 @@ type Conf struct {
 	}
 }
 
-// GetConfMarshal returns the configuration as a json byte array
-func (c *Conf) GetConfMarshal() []byte {
+// Marshal returns the configuration as a json byte array
+func (c *Conf) Marshal() []byte {
 	out, err := json.Marshal(c)
 	if err != nil {
 		return []byte{}
@@ -129,24 +137,7 @@ func (c *Conf) GetConfMarshal() []byte {
 	return out
 }
 
-// Verify checks if the configuration is valid
-func (c *Conf) Verify() bool {
-	if c.Server.Host == "" || c.Server.Port == "" {
-		return false
-	}
-	if c.Server.ReadTimeout == 0 {
-		c.Server.ReadTimeout = 5
-	}
-	if c.Server.WriteTimeout == 0 {
-		c.Server.WriteTimeout = 10
-	}
-	if c.Registry.HeartbeatInterval == 0 {
-		c.Registry.HeartbeatInterval = 30
-	}
-	return true
-}
-
-// LoadConf loads the configuration from the config.yaml file
+// Load loads the configuration from the config.yaml file
 func Load(configFile string) (*Conf, error) {
 	if configFile != "" {
 		viper.SetConfigFile(configFile)

@@ -52,15 +52,20 @@ func Config(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Get config", "req", util.RequestToMap(r))
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write(config.AppConfig.GetConfMarshal()); err != nil {
+	if _, err := w.Write(config.AppConfig.Marshal()); err != nil {
 		slog.Error("Error writing response", "error", err.Error())
 	}
 }
 
 // InitializeRoutes initializes the application routes
 func InitializeRoutes(r *RequestHandler) *http.ServeMux {
-	go r.ServiceRegistry.Heartbeat()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", r.HandleRequest)
+	return mux
+}
 
+func InitializeAdminRoutes(r *RequestHandler) *http.ServeMux {
+	go r.ServiceRegistry.Heartbeat()
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /services/register", r.ServiceRegistry.RegisterService)
 	mux.HandleFunc("POST /services/deregister", r.ServiceRegistry.DeregisterService)
@@ -68,7 +73,6 @@ func InitializeRoutes(r *RequestHandler) *http.ServeMux {
 	mux.HandleFunc("POST /services/update", r.ServiceRegistry.UpdateService)
 	mux.HandleFunc("GET /health", Health)
 	mux.HandleFunc("GET /config", Config)
-	mux.HandleFunc("/", r.HandleRequest)
 	mux.Handle("GET /metrics", promhttp.Handler())
 	return mux
 }

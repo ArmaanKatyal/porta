@@ -1,3 +1,12 @@
+admin:
+  port: 8081
+  readTimeout: 5
+  writeTimeout: 10
+  gracefulTimeout: 5
+  tls:
+    enabled: false
+    certFile: "path/to/cert.pem"
+    keyFile: "path/to/key.pem"
 server:
   host: localhost
   port: 8080

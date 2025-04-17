@@ -3,10 +3,12 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"time"
 
 	"github.com/ArmaanKatyal/porta/pkg/config"
@@ -37,48 +39,42 @@ func NewServer(cfg ServerConfig, handler http.Handler) *http.Server {
 	}
 }
 
-// Start initializes configuration, sets up logging, creates the server, and runs it.
-// It returns an error if the server fails unexpectedly.
+// Start initializes configuration, sets up logging, creates both servers, and runs them.
+// It will block until you hit Ctrl+C, then gracefully shut both down.
 func Start() error {
-	// 1) Configure logging
 	opts := logging.PrettyHandlerOptions{
-		SlogOpts: slog.HandlerOptions{
-			Level: slog.LevelDebug, // Adjust as needed
-		},
+		SlogOpts: slog.HandlerOptions{Level: slog.LevelDebug},
 	}
 	handler := logging.NewPrettyHandler(os.Stdout, opts)
 	logger := slog.New(handler)
 	slog.SetDefault(logger)
 
-	// 2) Load configuration
 	conf, err := config.Load("")
 	if err != nil {
 		return err
 	}
 	config.AppConfig = conf
 
-	// 3) Build the router
 	rh := router.NewRequestHandler()
-	r := router.InitializeRoutes(rh)
+	publicRouter := router.InitializeRoutes(rh)
+	adminRouter := router.InitializeAdminRoutes(rh)
 
-	// 4) Check TLS requirements
 	certFile := config.GetCertFile()
 	keyFile := config.GetKeyFile()
 	tlsEnabled := config.TLSEnabled()
 
 	if tlsEnabled {
 		if _, err := os.Stat(certFile); os.IsNotExist(err) {
-			slog.Warn("Certificate file not found, disabling TLS", "path", certFile)
+			slog.Warn("Certificate not found, disabling TLS", "path", certFile)
 			tlsEnabled = false
 		}
 		if _, err := os.Stat(keyFile); os.IsNotExist(err) {
-			slog.Warn("Key file not found, disabling TLS", "path", keyFile)
+			slog.Warn("Key not found, disabling TLS", "path", keyFile)
 			tlsEnabled = false
 		}
 	}
 
-	// 5) Create the server config
-	srvConfig := ServerConfig{
+	outerCfg := ServerConfig{
 		Addr:            ":" + config.AppConfig.Server.Port,
 		TLSConfig:       &tls.Config{MinVersion: tls.VersionTLS12},
 		ReadTimeout:     time.Duration(config.AppConfig.Server.ReadTimeout) * time.Second,
@@ -89,50 +85,76 @@ func Start() error {
 		TLSEnabled:      tlsEnabled,
 	}
 
-	// 6) Create the http.Server
-	srv := NewServer(srvConfig, r)
-
-	// 7) Handle graceful shutdown signals
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt)
-
-	slog.Info("API Gateway starting",
-		"port", config.AppConfig.Server.Port,
-		"tlsEnabled", tlsEnabled,
-	)
-
-	// 8) Run the server and wait for shutdown/interrupt/error
-	if err := StartServer(srv, srvConfig, stop); err != nil && err != http.ErrServerClosed {
-		slog.Error("server encountered an error", "error", err)
-		return err
+	adminCfg := ServerConfig{
+		Addr:            ":" + config.AppConfig.Admin.Port,
+		TLSConfig:       &tls.Config{MinVersion: tls.VersionTLS12},
+		ReadTimeout:     time.Duration(config.AppConfig.Admin.ReadTimeout) * time.Second,
+		WriteTimeout:    time.Duration(config.AppConfig.Admin.WriteTimeout) * time.Second,
+		GracefulTimeout: time.Duration(config.AppConfig.Admin.GracefulTimeout) * time.Second,
+		CertFile:        certFile,
+		KeyFile:         keyFile,
+		TLSEnabled:      tlsEnabled,
 	}
 
-	slog.Info("Server shutdown complete")
-	return nil
-}
+	publicSrv := NewServer(outerCfg, publicRouter)
+	adminSrv := NewServer(adminCfg, adminRouter)
 
-// StartServer runs the server in a goroutine and gracefully shuts down on interrupt.
-func StartServer(srv *http.Server, cfg ServerConfig, stop <-chan os.Signal) error {
-	serverErrCh := make(chan error, 1)
+	slog.Info("Starting servers",
+		"public_port", config.AppConfig.Server.Port,
+		"admin_port", config.AppConfig.Admin.Port,
+		"tls", tlsEnabled,
+	)
 
-	// Start the server in a goroutine
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt)
+
+	stop := make(chan struct{}) // closing this will wake *all* listeners
 	go func() {
-		if cfg.TLSEnabled {
-			serverErrCh <- srv.ListenAndServeTLS(cfg.CertFile, cfg.KeyFile)
-		} else {
-			serverErrCh <- srv.ListenAndServe()
+		<-sigCh
+		close(stop)
+	}()
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		if err := runServer(publicSrv, outerCfg, stop); err != nil && err != http.ErrServerClosed {
+			slog.Error("public server error", "err", err)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		if err := runServer(adminSrv, adminCfg, stop); err != nil && err != http.ErrServerClosed {
+			slog.Error("admin server error", "err", err)
 		}
 	}()
 
-	// Block until either we get a signal or the server fails
+	wg.Wait()
+	slog.Info("both servers shut down cleanly")
+	return nil
+}
+
+// runServer starts ListenAndServe( TLS ) and shuts down when `stop` is closed.
+func runServer(srv *http.Server, cfg ServerConfig, stop <-chan struct{}) error {
+	errCh := make(chan error, 1)
+
+	go func() {
+		if cfg.TLSEnabled {
+			errCh <- srv.ListenAndServeTLS(cfg.CertFile, cfg.KeyFile)
+		} else {
+			errCh <- srv.ListenAndServe()
+		}
+	}()
+
 	select {
 	case <-stop:
+		// graceful shutdown
 		ctx, cancel := context.WithTimeout(context.Background(), cfg.GracefulTimeout)
 		defer cancel()
 		return srv.Shutdown(ctx)
-
-	case err := <-serverErrCh:
-		// If the server stopped unexpectedly (e.g., port conflict)
-		return err
+	case err := <-errCh:
+		// e.g. port in use
+		return fmt.Errorf("listen error on %s: %w", cfg.Addr, err)
 	}
 }

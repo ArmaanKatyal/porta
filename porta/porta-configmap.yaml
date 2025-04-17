@@ -4,6 +4,15 @@ metadata:
   name: gateway-config
 data:
   config.yaml: |
+    admin:
+      port: 8081
+      readTimeout: 5
+      writeTimeout: 10
+      gracefulTimeout: 5
+      tls:
+        enabled: false
+        certFile: "path/to/cert.pem"
+        keyFile: "path/to/key.pem"
     server:
       host: localhost
       port: 8080
@@ -15,7 +24,7 @@ data:
         certFile: "path/to/cert.pem"
         keyFile: "path/to/key.pem"
       metrics:
-        prefix: "gateway"
+        prefix: "porta"
         buckets: [0.005, 0.01, 0.025, 0.05, 0.1]
     registry:
       heartbeatInterval: 15
