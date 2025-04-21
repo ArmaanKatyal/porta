@@ -2,23 +2,23 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"time"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/sony/gobreaker/v2"
-
-	"gopkg.in/yaml.v3"
+	"github.com/spf13/viper"
 )
 
-// AppConfig is the global configuration object
-var AppConfig Conf
-var Validate *validator.Validate
-
 func init() {
-	Validate = validator.New(validator.WithRequiredStructEnabled())
+	serviceName := "porta"
+
+	viper.SetDefault("server.port", "8080")
+	viper.SetDefault("admin.port", "8081")
+	viper.SetDefault("server.host", "localhost")
+	viper.SetDefault("server.metrics.prefix", serviceName)
+	viper.SetDefault("server.metrics.buckets", []float64{0.005, 0.01, 0.025, 0.05, 0.1})
 }
 
 type CircuitSettings struct {
@@ -82,10 +82,30 @@ type ServiceConf struct {
 	RateLimiter    RateLimiterSettings `yaml:"rateLimiter"`
 }
 
+type TLSConfig struct {
+	Enabled bool `yaml:"enabled"`
+	// path to the certificate and key files
+	CertFile string `yaml:"certFile"`
+	KeyFile  string `yaml:"keyFile"`
+}
+
+type Metrics struct {
+	Prefix  string    `yaml:"prefix"`
+	Buckets []float64 `yaml:"buckets"`
+}
+
 type Conf struct {
+	Admin struct {
+		Port            string    `yaml:"port"`
+		ReadTimeout     int       `yaml:"readTimeout"`
+		WriteTimeout    int       `yaml:"writeTimeout"`
+		GracefulTimeout int       `yaml:"gracefulTimeout"`
+		TLS             TLSConfig `yaml:"tls"`
+	} `yaml:"admin"`
 	Server struct {
-		Host string `yaml:"host"`
-		Port string `yaml:"port"`
+		Host      string `yaml:"host"`
+		Port      string `yaml:"port"`
+		AdminPort string `yaml:"adminPort"`
 		// the maximum duration for reading the entire request, including the body
 		ReadTimeout int `yaml:"readTimeout"`
 		// the maximum duration before timing out writes of the response
@@ -93,28 +113,19 @@ type Conf struct {
 		// the maximum duration before timing out the graceful shutdown
 		GracefulTimeout int `yaml:"gracefulTimeout"`
 
-		TLSConfig struct {
-			Enabled bool `yaml:"enabled"`
-			// path to the certificate and key files
-			CertFile string `yaml:"certFile"`
-			KeyFile  string `yaml:"keyFile"`
-		}
-
-		Metrics struct {
-			Prefix  string    `yaml:"prefix"`
-			Buckets []float64 `yaml:"buckets"`
-		} `yaml:"metrics"`
+		TLS     TLSConfig `yaml:"tls"`
+		Metrics Metrics   `yaml:"metrics"`
 	}
 
 	Registry struct {
 		// Interval (secs) at which the service will send a heartbeat to all registered services
 		HeartbeatInterval int `yaml:"heartbeatInterval"`
-		Services          []ServiceConf
+		Services          map[string]ServiceConf
 	}
 }
 
-// GetConfMarshal returns the configuration as a json byte array
-func (c *Conf) GetConfMarshal() []byte {
+// Marshal returns the configuration as a json byte array
+func (c *Conf) Marshal() []byte {
 	out, err := json.Marshal(c)
 	if err != nil {
 		return []byte{}
@@ -122,56 +133,24 @@ func (c *Conf) GetConfMarshal() []byte {
 	return out
 }
 
-// Verify checks if the configuration is valid
-func (c *Conf) Verify() bool {
-	if c.Server.Host == "" || c.Server.Port == "" {
-		return false
+// Load loads the configuration from the config.yaml file
+func Load(configFile string) (*Conf, error) {
+	if configFile != "" {
+		viper.SetConfigFile(configFile)
+	} else {
+		viper.SetConfigName("config")
+		viper.SetConfigType("yaml")
+		viper.AddConfigPath("./config")
 	}
-	if c.Server.ReadTimeout == 0 {
-		c.Server.ReadTimeout = 5
+	if err := viper.ReadInConfig(); err != nil {
+		return nil, fmt.Errorf("config file not found: %w", err)
 	}
-	if c.Server.WriteTimeout == 0 {
-		c.Server.WriteTimeout = 10
+	var config Conf
+	if err := viper.Unmarshal(&config); err != nil {
+		return nil, err
 	}
-	if c.Registry.HeartbeatInterval == 0 {
-		c.Registry.HeartbeatInterval = 30
-	}
-	return true
-}
 
-// LoadConf loads the configuration from the config.yaml file
-func LoadConf() {
-	c := Conf{}
-	yamlFile, err := os.ReadFile("./config/config.yaml")
-	if err != nil {
-		slog.Error("yamlFile.Get err", "error", err.Error())
-	}
-	err = yaml.Unmarshal(yamlFile, &c)
-	if err != nil {
-		slog.Error("yaml unmarshal error ocurred", "error", err.Error())
-		os.Exit(1)
-	}
-	if !c.Verify() {
-		slog.Error("Config verification failed")
-		os.Exit(1)
-	}
-	AppConfig = c
-	slog.Info("Config loaded successfully")
-}
-
-func GetCertFile() string {
-	// Append path to root folder
-	certPath := filepath.Join(GetWd(), AppConfig.Server.TLSConfig.CertFile)
-	return certPath
-}
-
-func GetKeyFile() string {
-	certPath := filepath.Join(GetWd(), AppConfig.Server.TLSConfig.KeyFile)
-	return certPath
-}
-
-func TLSEnabled() bool {
-	return AppConfig.Server.TLSConfig.Enabled
+	return &config, nil
 }
 
 func GetWd() string {

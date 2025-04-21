@@ -19,8 +19,9 @@ func TestTracingToList(t *testing.T) {
 
 func TestTracingNewPromMetrics(t *testing.T) {
 	t.Run("observability prefix match", func(t *testing.T) {
-		config.AppConfig.Server.Metrics.Prefix = "testing"
-		p := NewPromMetrics()
+		config := config.Conf{}
+		config.Server.Metrics.Prefix = "testing"
+		p := NewPromMetrics(&config)
 		assert.Equal(t, "testing", p.prefix)
 	})
 }

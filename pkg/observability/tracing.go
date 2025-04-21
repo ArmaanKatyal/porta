@@ -48,8 +48,8 @@ func getLabels() []string {
 	return labels
 }
 
-func NewPromMetrics() *PromMetrics {
-	prefix := config.AppConfig.Server.Metrics.Prefix
+func NewPromMetrics(conf *config.Conf) *PromMetrics {
+	prefix := conf.Server.Metrics.Prefix
 	return &PromMetrics{
 		prefix: prefix,
 		httpTransactionTotal: promauto.NewCounterVec(prometheus.CounterOpts{
@@ -60,7 +60,7 @@ func NewPromMetrics() *PromMetrics {
 			Name: prefix + "_response_time_seconds",
 			Help: "Histogram of response time for handler",
 		}, getLabels()),
-		buckets: config.AppConfig.Server.Metrics.Buckets,
+		buckets: conf.Server.Metrics.Buckets,
 	}
 }
 

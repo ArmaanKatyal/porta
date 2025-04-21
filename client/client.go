@@ -50,7 +50,13 @@ func health(c echo.Context) error {
 }
 
 func private(c echo.Context) error {
-	authToken := c.Request().Header.Get("Authorization")
+	cookie, err := c.Cookie("token")
+	var authToken string
+	if err == nil {
+		authToken = cookie.Value
+	} else {
+		authToken = c.Request().Header.Get("Authorization")
+	}
 	return c.JSON(http.StatusOK, PrivateBody{
 		Key:     authToken,
 		TraceID: c.Request().Header.Get("X-Trace-ID"),
@@ -68,6 +74,12 @@ func login(c echo.Context) error {
 	if err != nil {
 		return c.String(http.StatusInternalServerError, "jwt generation failed")
 	}
+	c.SetCookie(&http.Cookie{
+		Name:     "token",
+		Value:    token,
+		Path:     "/example",
+		HttpOnly: true,
+	})
 	return c.String(http.StatusOK, token)
 }
 
