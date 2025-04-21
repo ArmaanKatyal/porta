@@ -51,8 +51,10 @@ func health(c echo.Context) error {
 
 func private(c echo.Context) error {
 	cookie, err := c.Cookie("token")
-	authToken := cookie.Value
-	if authToken == "" || err != nil {
+	var authToken string
+	if err == nil {
+		authToken = cookie.Value
+	} else {
 		authToken = c.Request().Header.Get("Authorization")
 	}
 	return c.JSON(http.StatusOK, PrivateBody{
