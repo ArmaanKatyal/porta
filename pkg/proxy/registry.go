@@ -120,6 +120,7 @@ func (s *Service) Authenticate(r *http.Request) error {
 type ServiceRegistry struct {
 	mu       sync.RWMutex
 	Metrics  *observability.PromMetrics
+	Config   *config.Conf
 	Services map[string]*Service `json:"services"`
 }
 
@@ -183,7 +184,7 @@ func (sr *ServiceRegistry) GetFallbackUri(name string) string {
 // populateRegistryServices populates the service registry with the services in the configuration
 func populateRegistryServices(sr *ServiceRegistry) {
 	slog.Info("Populating registry services")
-	for _, v := range config.AppConfig.Registry.Services {
+	for _, v := range sr.Config.Registry.Services {
 		w := feature.NewIPWhiteList()
 		feature.PopulateIPWhiteList(w, v.WhiteList)
 		// Note: new fields for service in the config must be added here
@@ -204,10 +205,11 @@ func populateRegistryServices(sr *ServiceRegistry) {
 	}
 }
 
-func NewServiceRegistry(metrics *observability.PromMetrics) *ServiceRegistry {
+func NewServiceRegistry(conf *config.Conf, metrics *observability.PromMetrics) *ServiceRegistry {
 	r := ServiceRegistry{
 		Services: make(map[string]*Service),
 		Metrics:  metrics,
+		Config:   conf,
 	}
 	populateRegistryServices(&r)
 	return &r
@@ -355,7 +357,7 @@ func (sr *ServiceRegistry) GetServices(w http.ResponseWriter, r *http.Request) {
 // Heartbeat checks the health of the registered services
 func (sr *ServiceRegistry) Heartbeat() {
 	for {
-		time.Sleep(time.Duration(config.AppConfig.Registry.HeartbeatInterval) * time.Second)
+		time.Sleep(time.Duration(sr.Config.Registry.HeartbeatInterval) * time.Second)
 		sr.mu.RLock()
 		slog.Info("Heartbeat registered services")
 		for name, v := range sr.Services {

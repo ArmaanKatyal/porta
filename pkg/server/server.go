@@ -53,55 +53,63 @@ func Start() error {
 	if err != nil {
 		return err
 	}
-	config.AppConfig = conf
 
-	rh := router.NewRequestHandler()
+	rh := router.NewRequestHandler(conf)
 	publicRouter := router.InitializeRoutes(rh)
 	adminRouter := router.InitializeAdminRoutes(rh)
 
-	certFile := config.GetCertFile()
-	keyFile := config.GetKeyFile()
-	tlsEnabled := config.TLSEnabled()
-
+	tlsEnabled := conf.Server.TLS.Enabled
 	if tlsEnabled {
-		if _, err := os.Stat(certFile); os.IsNotExist(err) {
-			slog.Warn("Certificate not found, disabling TLS", "path", certFile)
+		if _, err := os.Stat(conf.Server.TLS.CertFile); os.IsNotExist(err) {
+			slog.Warn("Certificate not found, disabling TLS", "path", conf.Server.TLS.CertFile)
 			tlsEnabled = false
 		}
-		if _, err := os.Stat(keyFile); os.IsNotExist(err) {
-			slog.Warn("Key not found, disabling TLS", "path", keyFile)
+		if _, err := os.Stat(conf.Server.TLS.KeyFile); os.IsNotExist(err) {
+			slog.Warn("Key not found, disabling TLS", "path", conf.Server.TLS.KeyFile)
 			tlsEnabled = false
 		}
 	}
 
 	outerCfg := ServerConfig{
-		Addr:            ":" + config.AppConfig.Server.Port,
+		Addr:            ":" + conf.Server.Port,
 		TLSConfig:       &tls.Config{MinVersion: tls.VersionTLS12},
-		ReadTimeout:     time.Duration(config.AppConfig.Server.ReadTimeout) * time.Second,
-		WriteTimeout:    time.Duration(config.AppConfig.Server.WriteTimeout) * time.Second,
-		GracefulTimeout: time.Duration(config.AppConfig.Server.GracefulTimeout) * time.Second,
-		CertFile:        certFile,
-		KeyFile:         keyFile,
+		ReadTimeout:     time.Duration(conf.Server.ReadTimeout) * time.Second,
+		WriteTimeout:    time.Duration(conf.Server.WriteTimeout) * time.Second,
+		GracefulTimeout: time.Duration(conf.Server.GracefulTimeout) * time.Second,
+		CertFile:        conf.Server.TLS.CertFile,
+		KeyFile:         conf.Server.TLS.KeyFile,
 		TLSEnabled:      tlsEnabled,
 	}
 
+	adminTlsEnabled := conf.Admin.TLS.Enabled
+	if adminTlsEnabled {
+		if _, err := os.Stat(conf.Admin.TLS.CertFile); os.IsNotExist(err) {
+			slog.Warn("Certificate not found, disabling TLS", "path", conf.Admin.TLS.CertFile)
+			adminTlsEnabled = false
+		}
+		if _, err := os.Stat(conf.Admin.TLS.KeyFile); os.IsNotExist(err) {
+			slog.Warn("Key not found, disabling TLS", "path", conf.Admin.TLS.KeyFile)
+			adminTlsEnabled = false
+		}
+	}
+
 	adminCfg := ServerConfig{
-		Addr:            ":" + config.AppConfig.Admin.Port,
+		Addr:            ":" + conf.Admin.Port,
 		TLSConfig:       &tls.Config{MinVersion: tls.VersionTLS12},
-		ReadTimeout:     time.Duration(config.AppConfig.Admin.ReadTimeout) * time.Second,
-		WriteTimeout:    time.Duration(config.AppConfig.Admin.WriteTimeout) * time.Second,
-		GracefulTimeout: time.Duration(config.AppConfig.Admin.GracefulTimeout) * time.Second,
-		CertFile:        certFile,
-		KeyFile:         keyFile,
-		TLSEnabled:      tlsEnabled,
+		ReadTimeout:     time.Duration(conf.Admin.ReadTimeout) * time.Second,
+		WriteTimeout:    time.Duration(conf.Admin.WriteTimeout) * time.Second,
+		GracefulTimeout: time.Duration(conf.Admin.GracefulTimeout) * time.Second,
+		CertFile:        conf.Admin.TLS.CertFile,
+		KeyFile:         conf.Admin.TLS.KeyFile,
+		TLSEnabled:      adminTlsEnabled,
 	}
 
 	publicSrv := NewServer(outerCfg, publicRouter)
 	adminSrv := NewServer(adminCfg, adminRouter)
 
 	slog.Info("Starting servers",
-		"public_port", config.AppConfig.Server.Port,
-		"admin_port", config.AppConfig.Admin.Port,
+		"public_port", conf.Server.Port,
+		"admin_port", conf.Admin.Port,
 		"tls", tlsEnabled,
 	)
 

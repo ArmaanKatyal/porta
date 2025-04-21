@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -24,13 +25,15 @@ import (
 type RequestHandler struct {
 	ServiceRegistry *proxy.ServiceRegistry
 	Metrics         *observability.PromMetrics
+	Config          *config.Conf
 }
 
-func NewRequestHandler() *RequestHandler {
-	m := observability.NewPromMetrics()
+func NewRequestHandler(config *config.Conf) *RequestHandler {
+	m := observability.NewPromMetrics(config)
 	return &RequestHandler{
-		ServiceRegistry: proxy.NewServiceRegistry(m),
+		ServiceRegistry: proxy.NewServiceRegistry(config, m),
 		Metrics:         m,
+		Config:          config,
 	}
 }
 
@@ -39,7 +42,7 @@ func GetStatusCode(statusCode int) string {
 }
 
 // Health is a simple health check endpoint
-func Health(w http.ResponseWriter, r *http.Request) {
+func (rh *RequestHandler) Health(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Health check", "req", util.RequestToMap(r))
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write([]byte("OK")); err != nil {
@@ -48,11 +51,11 @@ func Health(w http.ResponseWriter, r *http.Request) {
 }
 
 // Config returns the application configuration
-func Config(w http.ResponseWriter, r *http.Request) {
+func (rh *RequestHandler) GetConfigRoute(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Get config", "req", util.RequestToMap(r))
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write(config.AppConfig.Marshal()); err != nil {
+	if _, err := w.Write(rh.Config.Marshal()); err != nil {
 		slog.Error("Error writing response", "error", err.Error())
 	}
 }
@@ -71,8 +74,8 @@ func InitializeAdminRoutes(r *RequestHandler) *http.ServeMux {
 	mux.HandleFunc("POST /services/deregister", r.ServiceRegistry.DeregisterService)
 	mux.HandleFunc("GET /services", r.ServiceRegistry.GetServices)
 	mux.HandleFunc("POST /services/update", r.ServiceRegistry.UpdateService)
-	mux.HandleFunc("GET /health", Health)
-	mux.HandleFunc("GET /config", Config)
+	mux.HandleFunc("GET /health", r.Health)
+	mux.HandleFunc("GET /config", r.GetConfigRoute)
 	mux.Handle("GET /metrics", promhttp.Handler())
 	return mux
 }
@@ -222,6 +225,10 @@ func (rh *RequestHandler) generateCacheKey(service string, r *http.Request) stri
 	return string(h.Sum(nil))
 }
 
+func (rh *RequestHandler) getGatewayPrefix(service string) string {
+	return fmt.Sprintf("/%s", service)
+}
+
 // forwardRequest forwards the request to the resolved service
 func (rh *RequestHandler) forwardRequest(w http.ResponseWriter, r *http.Request, forwardUri string, service string, t time.Time) error {
 	req, err := http.NewRequest(r.Method, forwardUri, r.Body)
@@ -230,10 +237,16 @@ func (rh *RequestHandler) forwardRequest(w http.ResponseWriter, r *http.Request,
 		return err
 	}
 	req.Header = cloneHeader(r.Header)
-
 	// add a unique trace id to every request for tracing
 	req.Header.Add("X-Trace-Id", uuid.NewString())
-	client := &http.Client{}
+
+	// Don't follow redirects automatically
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		rh.CollectMetrics(&observability.MetricsInput{Code: GetStatusCode(http.StatusInternalServerError), Method: r.Method, Route: r.URL.String()}, t)
@@ -242,21 +255,54 @@ func (rh *RequestHandler) forwardRequest(w http.ResponseWriter, r *http.Request,
 	defer func(Body io.ReadCloser) {
 		_ = Body.Close()
 	}(resp.Body)
-	// Copy the response from the resolved service
+
+	// Read the response body once
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		rh.CollectMetrics(&observability.MetricsInput{Code: GetStatusCode(http.StatusInternalServerError), Method: r.Method, Route: r.URL.String()}, t)
+		return err
+	}
+
+	// Handle redirects by updating the Location header
+	if resp.StatusCode >= 300 && resp.StatusCode < 400 && resp.Header.Get("Location") != "" {
+		originalLocation := resp.Header.Get("Location")
+
+		// Parse the original location URL
+		locationURL, err := url.Parse(originalLocation)
+		if err != nil {
+			slog.Error("failed to parse redirect location", "location", originalLocation, "error", err)
+		} else {
+			// Extract only the path (and query if present) from the downstream service's redirect
+			path := locationURL.Path
+			if locationURL.RawQuery != "" {
+				path += "?" + locationURL.RawQuery
+			}
+
+			// Get the gateway prefix (assuming baseURL from context or configuration)
+			gatewayPrefix := rh.getGatewayPrefix(service)
+
+			// Create new location with gateway prefix + service path
+			newLocation := gatewayPrefix + path
+
+			// Update the Location header
+			resp.Header.Set("Location", newLocation)
+			slog.Info("updated redirect location", "original", originalLocation, "new", newLocation)
+		}
+	}
+
+	// Copy the response headers and status code
 	copyResponseHeaders(w, resp)
 	w.WriteHeader(resp.StatusCode)
-	_, err = io.Copy(w, resp.Body)
+
+	// Write the body to the response writer
+	_, err = w.Write(responseBody)
 	if err != nil {
 		return err
 	}
 
-	// Save the response in the cache
-	val, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
+	// Save the response in the cache - we already have the body so no need to read again
 	key := rh.generateCacheKey(service, r)
-	if ok := rh.ServiceRegistry.SetCache(service, key, val); !ok {
+	if ok := rh.ServiceRegistry.SetCache(service, key, responseBody); !ok {
 		slog.Error("error setting value in cache", "service", service, "path", r.URL.String(), "key", key)
 		return errors.New("SetCache failed")
 	}
@@ -291,13 +337,18 @@ func (rh *RequestHandler) forwardRequestCB(w http.ResponseWriter, r *http.Reques
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new request: %w", err)
 		}
-
 		// Copy headers from the original request and add a trace ID
 		req.Header = cloneHeader(r.Header)
 		req.Header.Add("X-Trace-Id", uuid.NewString())
 
+		// Don't follow redirects automatically
+		client := &http.Client{
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
+
 		// Execute the request
-		client := &http.Client{}
 		resp, err := client.Do(req)
 		if err != nil {
 			return nil, fmt.Errorf("request execution failed: %w", err)
@@ -306,15 +357,43 @@ func (rh *RequestHandler) forwardRequestCB(w http.ResponseWriter, r *http.Reques
 			_ = Body.Close()
 		}(resp.Body)
 
-		// Copy response headers and status code
-		copyResponseHeaders(w, resp)
-		w.WriteHeader(resp.StatusCode)
-
 		// Read the response body
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read response body: %w", err)
 		}
+
+		// Handle redirects by updating the Location header
+		if resp.StatusCode >= 300 && resp.StatusCode < 400 && resp.Header.Get("Location") != "" {
+			originalLocation := resp.Header.Get("Location")
+
+			// Parse the original location URL
+			locationURL, err := url.Parse(originalLocation)
+			if err != nil {
+				slog.Error("failed to parse redirect location", "location", originalLocation, "error", err)
+			} else {
+				// Extract only the path (and query if present) from the downstream service's redirect
+				path := locationURL.Path
+				if locationURL.RawQuery != "" {
+					path += "?" + locationURL.RawQuery
+				}
+
+				// Get the gateway prefix for this service
+				gatewayPrefix := rh.getGatewayPrefix(service)
+
+				// Create new location with gateway prefix + service path
+				newLocation := gatewayPrefix + path
+
+				// Update the Location header
+				resp.Header.Set("Location", newLocation)
+				slog.Info("updated redirect location", "original", originalLocation, "new", newLocation)
+			}
+		}
+
+		// Copy response headers and status code
+		copyResponseHeaders(w, resp)
+		w.WriteHeader(resp.StatusCode)
+
 		return body, nil
 	}
 
@@ -341,7 +420,6 @@ func (rh *RequestHandler) forwardRequestCB(w http.ResponseWriter, r *http.Reques
 		return errors.New("SetCache failed")
 	}
 	slog.Info("SetCache successful cb", "service", service, "path", r.URL.String(), "key", key)
-
 	rh.CollectMetrics(&observability.MetricsInput{Code: GetStatusCode(http.StatusOK), Method: r.Method, Route: r.URL.String()}, t)
 	return nil
 }

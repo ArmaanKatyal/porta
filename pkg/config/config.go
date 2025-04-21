@@ -5,15 +5,11 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/sony/gobreaker/v2"
 	"github.com/spf13/viper"
 )
-
-// AppConfig is the global configuration object
-var AppConfig *Conf
 
 func init() {
 	serviceName := "porta"
@@ -155,21 +151,6 @@ func Load(configFile string) (*Conf, error) {
 	}
 
 	return &config, nil
-}
-
-func GetCertFile() string {
-	// Append path to root folder
-	certPath := filepath.Join(GetWd(), AppConfig.Server.TLS.CertFile)
-	return certPath
-}
-
-func GetKeyFile() string {
-	certPath := filepath.Join(GetWd(), AppConfig.Server.TLS.KeyFile)
-	return certPath
-}
-
-func TLSEnabled() bool {
-	return AppConfig.Server.TLS.Enabled
 }
 
 func GetWd() string {

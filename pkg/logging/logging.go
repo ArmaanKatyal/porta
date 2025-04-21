@@ -21,7 +21,6 @@ type PrettyHandler struct {
 
 func (h *PrettyHandler) Handle(ctx context.Context, r slog.Record) error {
 	level := r.Level.String() + ":"
-
 	switch r.Level {
 	case slog.LevelDebug:
 		level = color.MagentaString(level)
@@ -39,15 +38,20 @@ func (h *PrettyHandler) Handle(ctx context.Context, r slog.Record) error {
 		return true
 	})
 
-	b, err := json.Marshal(fields)
-	if err != nil {
-		return err
-	}
-
 	timeStr := r.Time.Format("[2006-01-02 15:04:05.000]")
 	msg := color.CyanString(r.Message)
 
-	h.l.Println(timeStr, level, msg, color.WhiteString(string(b)))
+	// Only print fields if there are any
+	if len(fields) > 0 {
+		b, err := json.Marshal(fields)
+		if err != nil {
+			return err
+		}
+		h.l.Println(timeStr, level, msg, color.WhiteString(string(b)))
+	} else {
+		// Skip printing fields part if empty
+		h.l.Println(timeStr, level, msg)
+	}
 
 	return nil
 }
@@ -60,6 +64,5 @@ func NewPrettyHandler(
 		Handler: slog.NewJSONHandler(out, &opts.SlogOpts),
 		l:       log.New(out, "", 0),
 	}
-
 	return h
 }

@@ -33,12 +33,12 @@ registry:
         uri: "/health"
       auth:
         enabled: true
-        anonymous: false
+        anonymous: true
         secret: "path/to/secret"
         routes:
           - "/private"
       cache:
-        enabled: true
+        enabled: false
         expirationInterval: 60
         cleanupInterval: 60
       circuitBreaker:
