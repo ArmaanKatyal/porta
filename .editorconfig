@@ -1,0 +1,26 @@
+# EditorConfig helps maintain consistent coding styles across editors
+# https://EditorConfig.org
+
+root = true
+
+# Top-level defaults
+[*]
+charset                = utf-8
+end_of_line            = lf
+trim_trailing_whitespace = true
+insert_final_newline     = true
+
+# Go source files
+[*.go]
+indent_style           = tab
+indent_size            = 4
+tab_width              = 4
+
+# Shell scripts & Makefiles: use spaces
+[*.{sh,Makefile}]
+indent_style           = space
+indent_size            = 2
+
+# Markdown and text: preserve trailing whitespace (e.g. for lists)
+[*.{md,txt}]
+trim_trailing_whitespace = false
