@@ -150,7 +150,7 @@ func TestAuthAuthenticate(t *testing.T) {
 		j := NewJwtAuth(defJwtAuth(), bytes.NewReader([]byte("test")))
 		err = j.Authenticate(req)
 		assert.Nil(t, err)
-		claims := map[string]interface{}{
+		claims := map[string]any{
 			"service": "test",
 			"exp":     exp,
 		}

@@ -39,11 +39,11 @@ func NewCacheHandler(conf *config.CacheSettings) *CacheHandler {
 	}
 }
 
-func (c *CacheHandler) Get(key string) (interface{}, bool) {
+func (c *CacheHandler) Get(key string) (any, bool) {
 	return c.cache.Get(key)
 }
 
-func (c *CacheHandler) Set(key string, value interface{}, exp CacheExpiration) {
+func (c *CacheHandler) Set(key string, value any, exp CacheExpiration) {
 	c.cache.Set(key, value, time.Duration(exp))
 }
 

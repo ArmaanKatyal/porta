@@ -3,8 +3,8 @@ package util
 import "net/http"
 
 // RequestToMap converts the request to a map
-func RequestToMap(r *http.Request) map[string]interface{} {
-	result := make(map[string]interface{})
+func RequestToMap(r *http.Request) map[string]any {
+	result := make(map[string]any)
 
 	result["method"] = r.Method
 

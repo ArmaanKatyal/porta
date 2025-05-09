@@ -64,7 +64,7 @@ func (j *JwtAuth) Authenticate(r *http.Request) JwtError {
 		}
 		// parse token
 		claims := &Claims{}
-		parsed, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
+		parsed, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (any, error) {
 			return j.getSecret(), nil
 		})
 		if err != nil {
